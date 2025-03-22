@@ -26,7 +26,7 @@
 ## To-Do
 - [x] Build a `Student Exam Score` regressor model
 - [x] Build a `Student Stress Level` classifier model
+- [x] Desktop application user interface
 - [ ] Web application user interface
-- [ ] Desktop application user interface
 - [ ] Publish application on `Windows` platform
 - [ ] Other AI features
