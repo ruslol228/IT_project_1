@@ -3,7 +3,7 @@
 ## About
 **Study Buddy** - an *AI*-powered study assistant. It helps students track _their_ **performance**, _predict_ exam **scores**, and _receive_ personalized study **recommendations**. By analyzing study habits, attendance, and other key factors, Study Buddy suggests how students can improve their scores and optimize their learning experience.
 
-![image](https://github.com/user-attachments/assets/22fcafe6-1db6-4637-8de9-722dfa27455a)
+![image](https://github.com/user-attachments/assets/21d57d02-a14e-47eb-8bf2-e1acd168c3a1)
 
 
 ## Features
