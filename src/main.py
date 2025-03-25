@@ -3,6 +3,8 @@ import flet as ft
 import pickle
 import warnings
 
+from flet.core.types import OptionalControlEventCallable
+
 warnings.filterwarnings('ignore')
 
 global_features = {
@@ -84,6 +86,60 @@ class Step(ft.Container):
                                )
 
 
+class Subject(ft.Container):
+    def __init__(self, deletable=True):
+        super().__init__()
+        self.bgcolor = ft.Colors.SURFACE
+        self.attendance_rate = ft.TextField(
+                                            border=ft.InputBorder.UNDERLINE,
+                                            input_filter=ft.NumbersOnlyInputFilter(),
+                                            on_change=self.attendance_changed,
+                                            width=32,
+                                            hint_text='%'
+                                            )
+
+        self.slider = ft.Slider(max=100, divisions=20, expand=1, label='{value}%', on_change=self.slider_changed)
+
+        self.content = ft.Column(
+            controls=[
+                ft.TextField(label='Subject name',
+                             border=ft.InputBorder.UNDERLINE,
+                             ),
+                ft.TextField(label='Hours studied a week',
+                             border=ft.InputBorder.UNDERLINE,
+                             filled=True,
+                             input_filter=ft.NumbersOnlyInputFilter()
+                             ),
+                ft.TextField(label='Tutor sessions a month',
+                             border=ft.InputBorder.UNDERLINE,
+                             filled=True,
+                             input_filter=ft.NumbersOnlyInputFilter()
+                             ),
+
+                ft.Row(controls=[
+                    ft.Text('Attendance rate',
+                            theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
+
+                    self.attendance_rate
+                ]),
+
+                self.slider
+            ]
+        )
+
+        self.border_radius = 25
+        self.padding = 25
+
+    def slider_changed(self, e):
+        self.attendance_rate.value = str(round(e.control.value))
+        self.update()
+
+    def attendance_changed(self, e):
+
+        self.slider.value = min(100, int(e.control.value)) if e.control.value else 0
+        self.update()
+
+
 def main(page: ft.Page):
     page.title = 'Study Buddy'
     page.theme = ft.Theme(color_scheme_seed=ft.Colors.DEEP_PURPLE)
@@ -95,29 +151,49 @@ def main(page: ft.Page):
     models = {}
 
     def change_feature_global(e):
+
         if e.control.data == 'extr':
-            global_features['reg']['Extracurricular_Activities_Yes'] = 1 if int(e.control.value) > 1 else 0
-            global_features['clf']['Extracurricular_Hours'] = int(e.control.value)
+            if not e.control.value:
+                global_features['reg']['Extracurricular_Activities_Yes'] = None
+                global_features['clf']['Extracurricular_Hours'] = None
+            else:
+                global_features['reg']['Extracurricular_Activities_Yes'] = 1 if int(e.control.value) > 1 else 0
+                global_features['clf']['Extracurricular_Hours'] = int(e.control.value) if e.control.value else None
         elif e.control.data == 'dist':
-            global_features['reg']['Distance_from_Home_Near'] = 1 if e.control.value == 'Near' else 0
-            global_features['reg']['Distance_from_Home_Moderate'] = 1 if e.control.value == 'Moderate' else 0
+            if not e.control.value:
+                global_features['reg']['Distance_from_Home_Near'] = None
+                global_features['reg']['Distance_from_Home_Moderate'] = None
+            else:
+                global_features['reg']['Distance_from_Home_Near'] = 1 if e.control.value == 'Near' else 0
+                global_features['reg']['Distance_from_Home_Moderate'] = 1 if e.control.value == 'Moderate' else 0
         elif e.control.data == 'pinv':
-            global_features['reg']['Parental_Involvement_Low'] = 1 if e.control.value == 'Low' else 0
-            global_features['reg']['Parental_Involvement_Medium'] = 1 if e.control.value == 'Medium' else 0
+            if not e.control.value:
+                global_features['reg']['Parental_Involvement_Low'] = None
+                global_features['reg']['Parental_Involvement_Medium'] = None
+            else:
+                global_features['reg']['Parental_Involvement_Low'] = 1 if e.control.value == 'Low' else 0
+                global_features['reg']['Parental_Involvement_Medium'] = 1 if e.control.value == 'Medium' else 0
         elif e.control.data == 'finc':
-            global_features['reg']['Family_Income_Low'] = 1 if e.control.value == 'Low' else 0
-            global_features['reg']['Family_Income_Medium'] = 1 if e.control.value == 'Medium' else 0
+            if not e.control.value:
+                global_features['reg']['Family_Income_Low'] = None
+                global_features['reg']['Family_Income_Medium'] = None
+            else:
+                global_features['reg']['Family_Income_Low'] = 1 if e.control.value == 'Low' else 0
+                global_features['reg']['Family_Income_Medium'] = 1 if e.control.value == 'Medium' else 0
         else:
             for model in global_features:
                 if e.control.data[0] in global_features[model]:
-                    global_features[model][e.control.data[0]] = e.control.data[1](e.control.value)
+                    if not e.control.value:
+                        global_features[model][e.control.data[0]] = None
+                    else:
+                        global_features[model][e.control.data[0]] = e.control.data[1](e.control.value)
+
+        print(global_features)
 
         # for model in global_features:
         #     for feature in global_features[model]:
         #         if global_features[model][feature] is None:
         #             print(model, feature)
-        #
-
 
     def load_models():
         models["reg"] = pickle.load(open('assets/models/student_performance_reg.pkl', 'rb'))
@@ -139,9 +215,9 @@ def main(page: ft.Page):
                     alignment=ft.alignment.center),
                 ft.Container(content=StepsColumn(
                     controls=[
-                        Step(value=True, text="Enter your academic factors."),
-                        Step(text="Receive performance predictions."),
-                        Step(text="Get feedback and advises.")
+                        Step(value=True, text="Enter your academic factors"),
+                        Step(text="Receive performance predictions"),
+                        Step(text="Get feedback and advises")
                     ],
                     spacing=25
                 ),
@@ -163,19 +239,19 @@ def main(page: ft.Page):
         ft.Row(controls=[
             ft.TextField(label='Hours of sleep', filled=True, expand=1, suffix_text='per day',
                          input_filter=ft.NumbersOnlyInputFilter(), on_change=change_feature_global,
-                         data=['Sleep_Hours', int]),
+                         data=['Sleep_Hours', int], border=ft.InputBorder.UNDERLINE),
             ft.TextField(label='Extracurricular hours', filled=True, expand=1, suffix_text='per day',
                          input_filter=ft.NumbersOnlyInputFilter(), on_change=change_feature_global,
-                         data='extr'),
+                         data='extr', border=ft.InputBorder.UNDERLINE),
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
 
         ft.Row(controls=[
             ft.TextField(label='Physical activities hours', filled=True, expand=1, suffix_text='per day',
                          input_filter=ft.NumbersOnlyInputFilter(), on_change=change_feature_global,
-                         data=['Physical_Activity', int]),
+                         data=['Physical_Activity', int], border=ft.InputBorder.UNDERLINE),
             ft.TextField(label='Social hours', filled=True, expand=1, suffix_text='per day',
                          input_filter=ft.NumbersOnlyInputFilter(), on_change=change_feature_global,
-                         data=['Social_Hours_Per_Day', int])
+                         data=['Social_Hours_Per_Day', int], border=ft.InputBorder.UNDERLINE)
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
 
         ft.Row(controls=[
@@ -213,14 +289,37 @@ def main(page: ft.Page):
 
     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=15, expand=1)
 
+
+
+    subjects_col = ft.Column(controls=[
+                                 Subject(deletable=False)
+                             ], spacing=20, scroll=ft.ScrollMode.AUTO, expand=1)
+
+    def new_subject(e):
+        subjects_col.controls.append(Subject())
+        page.update()
+
+    subjects = ft.Column(horizontal_alignment=ft.CrossAxisAlignment.START, expand=1,
+                         controls=[
+                             ft.Container(alignment=ft.alignment.center,
+                                          content=ft.Text('Subjects:', weight=ft.FontWeight.BOLD,
+                                                          theme_style=ft.TextThemeStyle.TITLE_LARGE)),
+
+                             subjects_col,
+                             ft.FilledButton(text='Add new',
+                                             icon=ft.Icons.ADD_OUTLINED,
+                                             on_click=new_subject
+                                             )
+                         ])
+
     right_screen = ft.Container(
-        expand=20, padding=25,
+        expand=20, padding=25, animate_opacity=ft.Animation(duration=400, curve=ft.AnimationCurve.EASE_IN),
+        opacity=0,
         content=ft.Column(controls=[
             general_questions,
-            ft.Divider(),
-            ft.Column(expand=1),
+            subjects,
         ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            alignment=ft.MainAxisAlignment.SPACE_AROUND,
             spacing=25)
     )
 
@@ -243,9 +342,22 @@ def main(page: ft.Page):
         expand=1
     )
 
+    def open_git(e):
+        page.launch_url('https://github.com/ruslol228/IT_project_1')
+        page.update()
+
     page.add(
-        main_screen
+        ft.Stack(controls=[main_screen,
+                           ft.Chip(label=ft.Text('Github'),
+                                   leading=ft.Icon(name='link'),
+                                   on_click=open_git,
+                                   left=32, bottom=32)
+                           ], expand=1)
     )
+
+    sleep(0.1)
+    right_screen.opacity = 1
+    page.update()
 
 
 ft.app(main, assets_dir='assets/')
