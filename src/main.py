@@ -3,8 +3,6 @@ import flet as ft
 import pickle
 import warnings
 
-from flet.core.types import OptionalControlEventCallable
-
 warnings.filterwarnings('ignore')
 
 global_features = {
@@ -30,14 +28,16 @@ global_features = {
         "Gender_Male": None,
     },
     'clf': {
-        "Study_Hours_Per_Day": None,
+        # "Study_Hours_Per_Day": None,
         "Extracurricular_Hours": None,
         "Sleep_Hours": None,
         "Social_Hours_Per_Day": None,
         "Physical_Activity": None,
-        "GPA": None,
+        # "GPA": None,
     }
 }
+
+features = []
 
 
 class IntroText(ft.Text):
@@ -87,35 +87,58 @@ class Step(ft.Container):
 
 
 class Subject(ft.Container):
-    def __init__(self, deletable=True):
+    def __init__(self, deletable=True, index=0, on_remove=None):
         super().__init__()
+        features.append({
+            'Subject_Name': None,
+            'Hours_Studied': None,
+            'Tutoring_Sessions': None,
+            'Attendance_Rate': None,
+            'Previous_Scores': 75
+        })
+
         self.bgcolor = ft.Colors.SURFACE
+        self.index = index
         self.attendance_rate = ft.TextField(
-                                            border=ft.InputBorder.UNDERLINE,
-                                            input_filter=ft.NumbersOnlyInputFilter(),
-                                            on_change=self.attendance_changed,
-                                            width=32,
-                                            hint_text='%'
-                                            )
+            border=ft.InputBorder.UNDERLINE,
+            input_filter=ft.NumbersOnlyInputFilter(),
+            on_change=self.attendance_changed,
+            data='Attendance_Rate',
+            width=32,
+            hint_text='%',
+        )
 
         self.slider = ft.Slider(max=100, divisions=20, expand=1, label='{value}%', on_change=self.slider_changed)
+        self.remove_btn = []
+        if deletable: self.remove_btn.append(ft.FilledTonalButton(
+            text='Remove subject', icon=ft.Icons.REMOVE_OUTLINED, bgcolor=ft.Colors.ERROR,
+            icon_color=ft.Colors.ERROR_CONTAINER, color=ft.Colors.ERROR_CONTAINER,
+            on_click=on_remove, data=self.index
+        ))
+        self.subject_name = ft.TextField(label=f'Subject {self.index + 1}', border=ft.InputBorder.UNDERLINE,
+                                         expand=1, on_change=self.on_change, data='Subject_Name'
+                                         )
+        self.hours_studied = ft.TextField(label='Hours studied a week',
+                                          border=ft.InputBorder.UNDERLINE,
+                                          filled=True,
+                                          input_filter=ft.NumbersOnlyInputFilter(), on_change=self.on_change,
+                                          data='Hours_Studied'
+                                          )
+
+        self.tutor_sessions = ft.TextField(label='Tutor sessions a month',
+                                           border=ft.InputBorder.UNDERLINE,
+                                           filled=True,
+                                           input_filter=ft.NumbersOnlyInputFilter(), on_change=self.on_change,
+                                           data='Tutoring_Sessions'
+                                           )
 
         self.content = ft.Column(
             controls=[
-                ft.TextField(label='Subject name',
-                             border=ft.InputBorder.UNDERLINE,
-                             ),
-                ft.TextField(label='Hours studied a week',
-                             border=ft.InputBorder.UNDERLINE,
-                             filled=True,
-                             input_filter=ft.NumbersOnlyInputFilter()
-                             ),
-                ft.TextField(label='Tutor sessions a month',
-                             border=ft.InputBorder.UNDERLINE,
-                             filled=True,
-                             input_filter=ft.NumbersOnlyInputFilter()
-                             ),
-
+                ft.Row(controls=[
+                                    self.subject_name
+                                ] + self.remove_btn),
+                self.hours_studied,
+                self.tutor_sessions,
                 ft.Row(controls=[
                     ft.Text('Attendance rate',
                             theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
@@ -130,13 +153,23 @@ class Subject(ft.Container):
         self.border_radius = 25
         self.padding = 25
 
+    def on_change(self, e):
+        if e.control.data == 'Subject_Name':
+            features[self.index]['Subject_Name'] = e.control.value
+        else:
+            features[self.index][e.control.data] = int(e.control.value)
+
+    def __repr__(self):
+        return f'Subject(index={self.index})'
+
     def slider_changed(self, e):
         self.attendance_rate.value = str(round(e.control.value))
+        features[self.index]["Attendance_Rate"] = round(e.control.value)
         self.update()
 
     def attendance_changed(self, e):
-
         self.slider.value = min(100, int(e.control.value)) if e.control.value else 0
+        self.on_change(e)
         self.update()
 
 
@@ -289,22 +322,28 @@ def main(page: ft.Page):
 
     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=15, expand=1)
 
-
-
     subjects_col = ft.Column(controls=[
-                                 Subject(deletable=False)
-                             ], spacing=20, scroll=ft.ScrollMode.AUTO, expand=1)
+        Subject(deletable=False)
+    ], spacing=20, scroll=ft.ScrollMode.AUTO, expand=1)
 
     def new_subject(e):
-        subjects_col.controls.append(Subject())
-        page.update()
+        subjects_col.controls.append(Subject(index=len(subjects_col.controls), on_remove=remove_subject))
+        subjects_col.update()
+
+    def remove_subject(e):
+        index = e.control.data
+        subjects_col.controls.pop(index)
+        features.pop(index)
+        for i in range(index, len(subjects_col.controls)):
+            subject = subjects_col.controls[i]
+            subject.index -= 1
+            subject.subject_name.label = f'Subject {i + 1}'
+            subject.remove_btn[0].data = i
+            subjects_col.controls[i].update()
+        subjects_col.update()
 
     subjects = ft.Column(horizontal_alignment=ft.CrossAxisAlignment.START, expand=1,
                          controls=[
-                             ft.Container(alignment=ft.alignment.center,
-                                          content=ft.Text('Subjects:', weight=ft.FontWeight.BOLD,
-                                                          theme_style=ft.TextThemeStyle.TITLE_LARGE)),
-
                              subjects_col,
                              ft.FilledButton(text='Add new',
                                              icon=ft.Icons.ADD_OUTLINED,
@@ -317,10 +356,16 @@ def main(page: ft.Page):
         opacity=0,
         content=ft.Column(controls=[
             general_questions,
-            subjects,
+            ft.Column(expand=1, controls=[
+                ft.Container(alignment=ft.alignment.center,
+                             content=ft.Text('Subjects:', weight=ft.FontWeight.BOLD,
+                                             theme_style=ft.TextThemeStyle.TITLE_LARGE)),
+
+                subjects
+            ]),
         ],
-            alignment=ft.MainAxisAlignment.SPACE_AROUND,
-            spacing=25)
+            alignment=ft.MainAxisAlignment.START,
+        )
     )
 
     # screenManager = ft.AnimatedSwitcher(
