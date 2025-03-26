@@ -17,6 +17,8 @@ global_features = {
         "Internet_Access_Yes": 1,
         "Family_Income_Low": None,
         "Family_Income_Medium": None,
+        'Teacher_Quality_Low': 0,
+        'Teacher_Quality_Medium': 1,
         "School_Type_Public": 1,
         "Peer_Influence_Neutral": 0,
         "Peer_Influence_Positive": 1,
@@ -68,6 +70,21 @@ class StepsColumn(ft.Column):
         self.animate_opacity = ft.Animation(duration=400, curve=ft.AnimationCurve.EASE_IN)
         self.opacity = 0
 
+    def next(self):
+        for i in range(len(self.controls) - 1):
+            if self.controls[i].value:
+                self.controls[i].value = False
+                self.controls[i].bgcolor = ft.Colors.ON_PRIMARY_CONTAINER
+                self.controls[i].content.color = ft.Colors.ON_PRIMARY
+                self.controls[i].update()
+
+                self.controls[i + 1].value = True
+                self.controls[i + 1].bgcolor = ft.Colors.ON_PRIMARY
+                self.controls[i + 1].content.color = ft.Colors.WHITE
+                self.controls[i + 1].update()
+
+                break
+
     def did_mount(self):
         sleep(0.2)
         self.opacity = 1
@@ -79,6 +96,7 @@ class Step(ft.Container):
         super().__init__()
         self.bgcolor = ft.Colors.ON_PRIMARY if value else ft.Colors.ON_PRIMARY_CONTAINER
         self.padding = 15
+        self.value = value
         self.border_radius = 30
         self.alignment = ft.alignment.center
         self.content = ft.Text(value=text, theme_style=ft.TextThemeStyle.TITLE_MEDIUM,
@@ -87,14 +105,17 @@ class Step(ft.Container):
 
 
 class Subject(ft.Container):
-    def __init__(self, deletable=True, index=0, on_remove=None):
+    def __init__(self, deletable=True, index=0, on_remove=None, check=None):
         super().__init__()
+        self.check = check
         features.append({
             'Subject_Name': None,
             'Hours_Studied': None,
-            'Tutoring_Sessions': None,
+            'Tutoring_Sessions': 2,
             'Attendance_Rate': None,
-            'Previous_Scores': 75
+            'Previous_Scores': None,
+            'Motivation_Level_Low': 0,
+            'Motivation_Level_Medium': 1
         })
 
         self.bgcolor = ft.Colors.SURFACE
@@ -116,20 +137,20 @@ class Subject(ft.Container):
             on_click=on_remove, data=self.index
         ))
         self.subject_name = ft.TextField(label=f'Subject {self.index + 1}', border=ft.InputBorder.UNDERLINE,
-                                         expand=1, on_change=self.on_change, data='Subject_Name'
+                                         expand=1, on_change=self.on_change, data='Subject_Name',
+                                         autofocus=bool(self.index)
                                          )
-        self.hours_studied = ft.TextField(label='Hours studied a week',
+        self.hours_studied = ft.TextField(label='Hours studied a day',
                                           border=ft.InputBorder.UNDERLINE,
                                           filled=True,
                                           input_filter=ft.NumbersOnlyInputFilter(), on_change=self.on_change,
                                           data='Hours_Studied'
                                           )
-
-        self.tutor_sessions = ft.TextField(label='Tutor sessions a month',
+        self.previous_score = ft.TextField(label='Previous score',
                                            border=ft.InputBorder.UNDERLINE,
                                            filled=True,
                                            input_filter=ft.NumbersOnlyInputFilter(), on_change=self.on_change,
-                                           data='Tutoring_Sessions'
+                                           data='Previous_Scores'
                                            )
 
         self.content = ft.Column(
@@ -138,7 +159,7 @@ class Subject(ft.Container):
                                     self.subject_name
                                 ] + self.remove_btn),
                 self.hours_studied,
-                self.tutor_sessions,
+                self.previous_score,
                 ft.Row(controls=[
                     ft.Text('Attendance rate',
                             theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
@@ -155,9 +176,13 @@ class Subject(ft.Container):
 
     def on_change(self, e):
         if e.control.data == 'Subject_Name':
-            features[self.index]['Subject_Name'] = e.control.value
+            features[self.index]['Subject_Name'] = e.control.value if e.control.value else None
         else:
-            features[self.index][e.control.data] = int(e.control.value)
+            if e.control.data == 'Hours_Studied':
+                features[self.index][e.control.data] = int(e.control.value) * 7 if e.control.value else None
+            else:
+                features[self.index][e.control.data] = int(e.control.value) if e.control.value else None
+        self.check()
 
     def __repr__(self):
         return f'Subject(index={self.index})'
@@ -165,6 +190,7 @@ class Subject(ft.Container):
     def slider_changed(self, e):
         self.attendance_rate.value = str(round(e.control.value))
         features[self.index]["Attendance_Rate"] = round(e.control.value)
+        self.check()
         self.update()
 
     def attendance_changed(self, e):
@@ -182,6 +208,27 @@ def main(page: ft.Page):
 
     global global_features
     models = {}
+
+    def global_ready():
+        for model in global_features:
+            if None in global_features[model].values():
+                return False
+        return True
+
+    def subjects_ready():
+        for subject in subjects_col.controls:
+            if None in features[subject.index].values():
+                return False
+        return True
+
+    def check_subjects():
+        if global_ready() and subjects_ready():
+            continue_btn.disabled = False
+            continue_btn.tooltip = None
+            continue_btn.update()
+        else:
+            continue_btn.disabled = True
+            continue_btn.update()
 
     def change_feature_global(e):
 
@@ -221,18 +268,28 @@ def main(page: ft.Page):
                     else:
                         global_features[model][e.control.data[0]] = e.control.data[1](e.control.value)
 
-        print(global_features)
-
-        # for model in global_features:
-        #     for feature in global_features[model]:
-        #         if global_features[model][feature] is None:
-        #             print(model, feature)
+        if global_ready() and subjects_ready():
+            continue_btn.disabled = False
+            continue_btn.tooltip = None
+            continue_btn.update()
+        else:
+            continue_btn.disabled = True
+            continue_btn.update()
 
     def load_models():
         models["reg"] = pickle.load(open('assets/models/student_performance_reg.pkl', 'rb'))
         models["clf"] = pickle.load(open('assets/models/student_stress_clf.pkl', 'rb'))
 
     page.run_thread(load_models)
+
+    steps = StepsColumn(
+        controls=[
+            Step(value=True, text="Enter your academic factors"),
+            Step(text="Receive performance predictions"),
+            Step(text="Get feedback and advises")
+        ],
+        spacing=25
+    )
 
     left_screen = ft.Container(
         content=ft.Column(
@@ -246,17 +303,10 @@ def main(page: ft.Page):
                     wait=0.15
                 ),
                     alignment=ft.alignment.center),
-                ft.Container(content=StepsColumn(
-                    controls=[
-                        Step(value=True, text="Enter your academic factors"),
-                        Step(text="Receive performance predictions"),
-                        Step(text="Get feedback and advises")
-                    ],
-                    spacing=25
-                ),
-                    alignment=ft.alignment.center,
-                    padding=25
-                )
+                ft.Container(content=steps,
+                             alignment=ft.alignment.center,
+                             padding=25
+                             )
             ],
             alignment=ft.MainAxisAlignment.CENTER,
             spacing=20
@@ -323,12 +373,31 @@ def main(page: ft.Page):
     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=15, expand=1)
 
     subjects_col = ft.Column(controls=[
-        Subject(deletable=False)
-    ], spacing=20, scroll=ft.ScrollMode.AUTO, expand=1)
+        Subject(deletable=False, check=check_subjects)
+    ], spacing=20, scroll=ft.ScrollMode.ALWAYS, expand=1)
 
     def new_subject(e):
-        subjects_col.controls.append(Subject(index=len(subjects_col.controls), on_remove=remove_subject))
+        subjects_col.controls.append(Subject(index=len(subjects_col.controls), on_remove=remove_subject,
+                                             check=check_subjects
+                                             ))
+        check_subjects()
         subjects_col.update()
+
+    def next_category(cat: str) -> str:
+        match cat:
+            case "B": return "A"
+            case "C": return "B"
+            case "D": return "C"
+            case "E": return "D"
+            case "F": return "E"
+
+    def category(num: int) -> str:
+        if num > 90: return "A"
+        if num > 80: return "B"
+        if num > 70: return "C"
+        if num > 60: return "D"
+        if num > 50: return "E"
+        else: return "F"
 
     def remove_subject(e):
         index = e.control.data
@@ -340,42 +409,154 @@ def main(page: ft.Page):
             subject.subject_name.label = f'Subject {i + 1}'
             subject.remove_btn[0].data = i
             subjects_col.controls[i].update()
+        check_subjects()
         subjects_col.update()
 
+    reg_preds = []
+
+    def predictions():
+        # Regression
+        for subject in features:
+            result = round(models['reg'].predict(
+                        [[
+                            subject['Hours_Studied'],
+                            subject['Attendance_Rate'],
+                            global_features['reg']['Sleep_Hours'],
+                            subject['Previous_Scores'],
+                            subject['Tutoring_Sessions'],
+                            global_features['reg']['Physical_Activity'],
+                            global_features['reg']['Parental_Involvement_Low'],
+                            global_features['reg']['Parental_Involvement_Medium'],
+                            global_features['reg']['Access_to_Resources_Low'],
+                            global_features['reg']['Access_to_Resources_Medium'],
+                            global_features['reg']['Extracurricular_Activities_Yes'],
+                            subject['Motivation_Level_Low'],
+                            subject['Motivation_Level_Medium'],
+                            global_features['reg']['Internet_Access_Yes'],
+                            global_features['reg']['Family_Income_Low'],
+                            global_features['reg']['Family_Income_Medium'],
+                            global_features['reg']['Teacher_Quality_Low'],
+                            global_features['reg']['Teacher_Quality_Medium'],
+                            global_features['reg']['School_Type_Public'],
+                            global_features['reg']['Peer_Influence_Neutral'],
+                            global_features['reg']['Peer_Influence_Positive'],
+                            global_features['reg']['Learning_Disabilities_Yes'],
+                            global_features['reg']['Parental_Education_Level_High_School'],
+                            global_features['reg']['Parental_Education_Level_Postgraduate'],
+                            global_features['reg']['Distance_from_Home_Moderate'],
+                            global_features['reg']['Distance_from_Home_Near'],
+                            global_features['reg']['Gender_Male'],
+                        ]]
+                    )[0], 2)
+
+            reg_preds.append([
+                subject["Subject_Name"],
+                result,
+                category(result)
+            ])
+
+            reg_dt.rows.append(ft.DataRow(
+                cells=[
+                    ft.DataCell(ft.Text(pred)) for pred in reg_preds[-1]
+                ]
+            ))
+
+
+
+        reg_column.content.controls = [
+            ft.Text(value='Final exam performance predictions:', theme_style=ft.TextThemeStyle.TITLE_LARGE,
+                    weight=ft.FontWeight.BOLD
+                    ),
+            reg_dt
+        ]
+        reg_column.update()
+
+    reg_dt = ft.DataTable(columns=[
+        ft.DataColumn(ft.Text("Subject")),
+        ft.DataColumn(ft.Text("Result"), numeric=True),
+        ft.DataColumn(ft.Text('Category'))
+    ], sort_column_index=1
+    )
+
+    reg_column = ft.Container(alignment=ft.alignment.center, expand=1,
+                              content=ft.Column(horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                                alignment=ft.MainAxisAlignment.CENTER,
+                                                controls=[
+                                                    ft.Text(value='Loading regression report...',
+                                                            theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
+                                                    ft.ProgressRing()
+                                                ]))
+
+    clf_column = ft.Container(alignment=ft.alignment.center, expand=1,
+                              content=ft.Column(horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                                alignment=ft.MainAxisAlignment.CENTER,
+                                                controls=[
+                                                    ft.Text(value='Loading classification report...',
+                                                            theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
+                                                    ft.ProgressRing()
+                                                ]))
+
+    reports_screen = ft.Column(controls=[
+        reg_column,
+        ft.Divider(),
+        clf_column
+    ])
+
+    def continue_event(e):
+        steps.next()
+        screenManager.content = reports_screen
+        page.update()
+
+        page.run_thread(predictions)
+
+    continue_btn = ft.FilledButton(text='Continue', disabled=True, icon=ft.Icons.ARROW_FORWARD_ROUNDED,
+                                   on_click=continue_event,
+                                   tooltip=ft.Tooltip(message='Fill all blanks before continuing...',
+                                                      enable_tap_to_dismiss=False,
+                                                      )
+                                   )
+
     subjects = ft.Column(horizontal_alignment=ft.CrossAxisAlignment.START, expand=1,
+                         spacing=20,
                          controls=[
                              subjects_col,
-                             ft.FilledButton(text='Add new',
-                                             icon=ft.Icons.ADD_OUTLINED,
-                                             on_click=new_subject
-                                             )
+                             ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                                    controls=[ft.FilledButton(text='Add new',
+                                                              icon=ft.Icons.ADD_OUTLINED,
+                                                              on_click=new_subject
+                                                              ),
+                                              continue_btn
+                                              ])
                          ])
+
+    intro_screen = ft.Column(controls=[
+        general_questions,
+        ft.Column(expand=1, controls=[
+            ft.Container(alignment=ft.alignment.center,
+                         content=ft.Text('Subjects:', weight=ft.FontWeight.BOLD,
+                                         theme_style=ft.TextThemeStyle.TITLE_LARGE)),
+
+            subjects,
+
+        ]),
+    ],
+        alignment=ft.MainAxisAlignment.START,
+    )
+
+    screenManager = ft.AnimatedSwitcher(
+        intro_screen,
+        transition=ft.AnimatedSwitcherTransition.FADE,
+        duration=500,
+        reverse_duration=500,
+        switch_in_curve=ft.AnimationCurve.EASE_IN,
+        switch_out_curve=ft.AnimationCurve.EASE_OUT
+    )
 
     right_screen = ft.Container(
         expand=20, padding=25, animate_opacity=ft.Animation(duration=400, curve=ft.AnimationCurve.EASE_IN),
         opacity=0,
-        content=ft.Column(controls=[
-            general_questions,
-            ft.Column(expand=1, controls=[
-                ft.Container(alignment=ft.alignment.center,
-                             content=ft.Text('Subjects:', weight=ft.FontWeight.BOLD,
-                                             theme_style=ft.TextThemeStyle.TITLE_LARGE)),
-
-                subjects
-            ]),
-        ],
-            alignment=ft.MainAxisAlignment.START,
-        )
+        content=screenManager
     )
-
-    # screenManager = ft.AnimatedSwitcher(
-    #     intro_screen,
-    #     transition=ft.AnimatedSwitcherTransition.FADE,
-    #     duration=500,
-    #     reverse_duration=500,
-    #     switch_in_curve=ft.AnimationCurve.EASE_IN,
-    #     switch_out_curve=ft.AnimationCurve.EASE_OUT
-    # )
 
     main_screen = ft.Container(
         content=ft.Row(
