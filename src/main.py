@@ -385,19 +385,26 @@ def main(page: ft.Page):
 
     def next_category(cat: str) -> str:
         match cat:
-            case "B": return "A"
-            case "C": return "B"
-            case "D": return "C"
-            case "E": return "D"
-            case "F": return "E"
+            case "B":
+                return "A"
+            case "C":
+                return "B"
+            case "D":
+                return "C"
+            case "E":
+                return "D"
+            case "F":
+                return "E"
 
     def category(num: int) -> str:
         if num > 90: return "A"
         if num > 80: return "B"
         if num > 70: return "C"
         if num > 60: return "D"
-        if num > 50: return "E"
-        else: return "F"
+        if num > 50:
+            return "E"
+        else:
+            return "F"
 
     def remove_subject(e):
         index = e.control.data
@@ -412,54 +419,56 @@ def main(page: ft.Page):
         check_subjects()
         subjects_col.update()
 
-    reg_preds = []
-
     def predictions():
+        global_features['clf']['GPA'] = 0
+        global_features['clf']['Study_Hours_Per_Day'] = 0
+
         # Regression
         for subject in features:
-            result = round(models['reg'].predict(
-                        [[
-                            subject['Hours_Studied'],
-                            subject['Attendance_Rate'],
-                            global_features['reg']['Sleep_Hours'],
-                            subject['Previous_Scores'],
-                            subject['Tutoring_Sessions'],
-                            global_features['reg']['Physical_Activity'],
-                            global_features['reg']['Parental_Involvement_Low'],
-                            global_features['reg']['Parental_Involvement_Medium'],
-                            global_features['reg']['Access_to_Resources_Low'],
-                            global_features['reg']['Access_to_Resources_Medium'],
-                            global_features['reg']['Extracurricular_Activities_Yes'],
-                            subject['Motivation_Level_Low'],
-                            subject['Motivation_Level_Medium'],
-                            global_features['reg']['Internet_Access_Yes'],
-                            global_features['reg']['Family_Income_Low'],
-                            global_features['reg']['Family_Income_Medium'],
-                            global_features['reg']['Teacher_Quality_Low'],
-                            global_features['reg']['Teacher_Quality_Medium'],
-                            global_features['reg']['School_Type_Public'],
-                            global_features['reg']['Peer_Influence_Neutral'],
-                            global_features['reg']['Peer_Influence_Positive'],
-                            global_features['reg']['Learning_Disabilities_Yes'],
-                            global_features['reg']['Parental_Education_Level_High_School'],
-                            global_features['reg']['Parental_Education_Level_Postgraduate'],
-                            global_features['reg']['Distance_from_Home_Moderate'],
-                            global_features['reg']['Distance_from_Home_Near'],
-                            global_features['reg']['Gender_Male'],
-                        ]]
-                    )[0], 2)
+            subject["Result"] = round(models['reg'].predict(
+                [[
+                    subject['Hours_Studied'],
+                    subject['Attendance_Rate'],
+                    global_features['reg']['Sleep_Hours'],
+                    subject['Previous_Scores'],
+                    subject['Tutoring_Sessions'],
+                    global_features['reg']['Physical_Activity'],
+                    global_features['reg']['Parental_Involvement_Low'],
+                    global_features['reg']['Parental_Involvement_Medium'],
+                    global_features['reg']['Access_to_Resources_Low'],
+                    global_features['reg']['Access_to_Resources_Medium'],
+                    global_features['reg']['Extracurricular_Activities_Yes'],
+                    subject['Motivation_Level_Low'],
+                    subject['Motivation_Level_Medium'],
+                    global_features['reg']['Internet_Access_Yes'],
+                    global_features['reg']['Family_Income_Low'],
+                    global_features['reg']['Family_Income_Medium'],
+                    global_features['reg']['Teacher_Quality_Low'],
+                    global_features['reg']['Teacher_Quality_Medium'],
+                    global_features['reg']['School_Type_Public'],
+                    global_features['reg']['Peer_Influence_Neutral'],
+                    global_features['reg']['Peer_Influence_Positive'],
+                    global_features['reg']['Learning_Disabilities_Yes'],
+                    global_features['reg']['Parental_Education_Level_High_School'],
+                    global_features['reg']['Parental_Education_Level_Postgraduate'],
+                    global_features['reg']['Distance_from_Home_Moderate'],
+                    global_features['reg']['Distance_from_Home_Near'],
+                    global_features['reg']['Gender_Male'],
+                ]]
+            )[0], 2)
 
-            reg_preds.append([
-                subject["Subject_Name"],
-                result,
-                category(result)
-            ])
+            global_features['clf']['Study_Hours_Per_Day'] += subject['Hours_Studied']
+            global_features["clf"]['GPA'] += subject['Result']
 
             reg_dt.rows.append(ft.DataRow(
                 cells=[
-                    ft.DataCell(ft.Text(pred)) for pred in reg_preds[-1]
+                    ft.DataCell(ft.Text(pred)) for pred in
+                    [subject["Subject_Name"], subject['Result'], category(subject["Result"])]
                 ]
             ))
+
+        global_features['clf']['Study_Hours_Per_Day'] //= len(features)
+        global_features["clf"]['GPA'] = round(global_features["clf"]['GPA'] / len(features) / 25.00, 2)
 
 
 
@@ -467,9 +476,31 @@ def main(page: ft.Page):
             ft.Text(value='Final exam performance predictions:', theme_style=ft.TextThemeStyle.TITLE_LARGE,
                     weight=ft.FontWeight.BOLD
                     ),
-            reg_dt
+            reg_dt,
+            ft.Text(value=f'Your GPA score: {global_features['clf']['GPA']}',
+                    theme_style=ft.TextThemeStyle.TITLE_LARGE,
+                    weight=ft.FontWeight.BOLD)
         ]
+
         reg_column.update()
+
+        global_features['clf']['Stress_Level'] = ['High', 'Low', 'Moderate'][models['clf'].predict([[
+            global_features['clf']['Study_Hours_Per_Day'],
+            global_features['clf']['Extracurricular_Hours'],
+            global_features['clf']['Sleep_Hours'],
+            global_features['clf']['Social_Hours_Per_Day'],
+            global_features['clf']['Physical_Activity'],
+            global_features['clf']['GPA']
+        ]])[0]]
+
+        clf_column.content = ft.Container(content=ft.Text(
+            value=f'Your predicted stress level is: {global_features['clf']['Stress_Level']}',
+            theme_style=ft.TextThemeStyle.TITLE_LARGE,
+            weight=ft.FontWeight.BOLD
+        ), alignment=ft.alignment.center, expand=1
+        )
+
+        clf_column.update()
 
     reg_dt = ft.DataTable(columns=[
         ft.DataColumn(ft.Text("Subject")),
