@@ -2,8 +2,10 @@ from time import sleep
 import flet as ft
 import pickle
 import warnings
+from g4f.client import Client
 
 warnings.filterwarnings('ignore')
+client = Client()
 
 global_features = {
     'reg': {
@@ -383,19 +385,6 @@ def main(page: ft.Page):
         check_subjects()
         subjects_col.update()
 
-    def next_category(cat: str) -> str:
-        match cat:
-            case "B":
-                return "A"
-            case "C":
-                return "B"
-            case "D":
-                return "C"
-            case "E":
-                return "D"
-            case "F":
-                return "E"
-
     def category(num: int) -> str:
         if num > 90: return "A"
         if num > 80: return "B"
@@ -462,15 +451,14 @@ def main(page: ft.Page):
 
             reg_dt.rows.append(ft.DataRow(
                 cells=[
-                    ft.DataCell(ft.Text(pred)) for pred in
-                    [subject["Subject_Name"], subject['Result'], category(subject["Result"])]
+                    ft.DataCell(ft.Text(pred)) for pred in [subject["Subject_Name"],
+                                                            subject['Result'],
+                                                            category(subject["Result"])]
                 ]
             ))
 
         global_features['clf']['Study_Hours_Per_Day'] //= len(features)
         global_features["clf"]['GPA'] = round(global_features["clf"]['GPA'] / len(features) / 25.00, 2)
-
-
 
         reg_column.content.controls = [
             ft.Text(value='Final exam performance predictions:', theme_style=ft.TextThemeStyle.TITLE_LARGE,
@@ -493,14 +481,81 @@ def main(page: ft.Page):
             global_features['clf']['GPA']
         ]])[0]]
 
-        clf_column.content = ft.Container(content=ft.Text(
-            value=f'Your predicted stress level is: {global_features['clf']['Stress_Level']}',
-            theme_style=ft.TextThemeStyle.TITLE_LARGE,
-            weight=ft.FontWeight.BOLD
-        ), alignment=ft.alignment.center, expand=1
-        )
+        clf_column.content = ft.Container(content=ft.Column(controls=[
+            ft.Column(controls=[
+                ft.Text(value='Your predicted stress level is:', theme_style=ft.TextThemeStyle.TITLE_LARGE,
+                        weight=ft.FontWeight.BOLD
+                        ),
+                ft.Container(
+                    image=ft.DecorationImage(src=f'images/{global_features['clf']['Stress_Level'].lower()}.png',
+                                             fit=ft.ImageFit.FILL),
+                    width=154, height=79
+                ),
+
+                ft.Text(value=global_features['clf']['Stress_Level'], theme_style=ft.TextThemeStyle.TITLE_LARGE,
+                        weight=ft.FontWeight.BOLD
+                        )
+
+            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER,
+                spacing=25, expand=1
+            ),
+
+            ft.Row(alignment=ft.MainAxisAlignment.END, controls=[
+                ft.FilledButton(text='Continue', icon=ft.Icons.ARROW_FORWARD_ROUNDED,
+                                on_click=feedback_event
+                                )
+            ])
+
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER,
+            spacing=25, expand=1
+        ), alignment=ft.alignment.center, expand=1)
 
         clf_column.update()
+
+    def feedback_event(e):
+        steps.next()
+        screenManager.content = feedback_screen
+        for subject in features:
+            feedback_tabs.tabs.append(ft.Tab(text=subject['Subject_Name'], content=ft.Container(
+                padding=20,
+                content=ft.Column(controls=[
+                    ft.Text(value='Generating feedback...',
+                            theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
+                    ft.ProgressRing()
+                ], scroll=ft.ScrollMode.AUTO, spacing=25)
+            )))
+
+        page.update()
+
+        page.run_thread(feedback)
+
+    def gpt(index, prompt):
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            web_search=False
+        )
+        feedback_tabs.tabs[index].content = ft.Container(content=ft.Column(controls=[
+            ft.Markdown(value=response.choices[0].message.content)
+        ], scroll=ft.ScrollMode.AUTO), padding=15)
+        feedback_tabs.update()
+
+
+    def feedback():
+        for i, subject in enumerate(features):
+            page.run_thread(gpt, i, f'''You're a part of a program called "Study Buddy", which is a simple AI assistant for tracking student performance. It predicts exam score for each subject user provides, as well as predicting overall stress level. You're given a subject's name, a predicted exam score and stress level.
+        Give some tactics and ideas of how to improve user's result and to reduce stress level.
+        SUBJECT: {subject['Subject_Name']}
+        SCORE: {subject['Result']}
+        STRESS_LEVEL: {global_features['clf']['Stress_Level']}
+        ''')
+
+
 
     reg_dt = ft.DataTable(columns=[
         ft.DataColumn(ft.Text("Subject")),
@@ -532,6 +587,10 @@ def main(page: ft.Page):
         ft.Divider(),
         clf_column
     ])
+
+    feedback_tabs = ft.Tabs(animation_duration=400, tabs=[])
+
+    feedback_screen = ft.Container(content=feedback_tabs, alignment=ft.alignment.center, expand=1, padding=25)
 
     def continue_event(e):
         steps.next()
