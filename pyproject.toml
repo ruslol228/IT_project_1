@@ -1,6 +1,6 @@
 [project]
-name = "it-project"
-version = "0.1.0"
+name = "Study Buddy"
+version = "1.0.0"
 description = ""
 readme = "README.md"
 requires-python = ">=3.9"
@@ -8,7 +8,9 @@ authors = [
     { name = "Flet developer", email = "you@example.com" }
 ]
 dependencies = [
-  "flet==0.27.6"
+  "flet==0.27.6",
+  "g4f[openai]==0.4.9.8",
+  "scikit-learn==1.6.1",
 ]
 
 [tool.flet]
@@ -18,7 +20,7 @@ org = "com.mycompany"
 
 # project display name that is used as an app title on Android and iOS home screens,
 # shown in window titles and about app dialogs on desktop.
-product = "it-project"
+product = "Study-Buddy"
 
 # company name to display in about app dialogs
 company = "Flet"
@@ -31,7 +33,7 @@ path = "src"
 
 [tool.uv]
 dev-dependencies = [
-    "flet[all]==0.27.6",
+    "flet[all]==0.27.6"
 ]
 
 [tool.poetry]
