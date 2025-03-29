@@ -6,7 +6,7 @@ from flet import (Text, Animation, Column, Row, TextField, TextThemeStyle, FontW
                   NumbersOnlyInputFilter,
                   Slider, FilledButton, FilledTonalButton, Icons, Theme, Page, Margin, ScrollMode,
                   DataColumn, DataRow, DataCell, DataTable, ImageFit, ProgressRing, Tabs, Tab, Markdown,
-                  Divider, Stack, Chip, Tooltip, Icon, app)
+                  Divider, Stack, Chip, Tooltip, Icon, app, WEB_BROWSER)
 import pickle
 from g4f.client import Client
 
@@ -676,4 +676,4 @@ def main(page: Page):
     page.update()
 
 
-app(main, assets_dir='assets/')
+app(main, assets_dir='assets/', view=WEB_BROWSER)
